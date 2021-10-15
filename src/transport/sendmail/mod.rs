@@ -87,6 +87,7 @@ use std::marker::PhantomData;
 use std::{
     ffi::OsString,
     io::Write,
+    path::PathBuf,
     process::{Command, Stdio},
 };
 
@@ -115,9 +116,18 @@ pub struct AsyncSendmailTransport<E: Executor> {
 impl SendmailTransport {
     /// Creates a new transport with the default `/usr/sbin/sendmail` command
     pub fn new() -> SendmailTransport {
-        SendmailTransport {
-            command: DEFAULT_SENDMAIL.into(),
+        // Check if sendmail is at DEFAULT_SENDMAIL, else look in $PATH or fail
+        let sendmail_path = PathBuf::from(DEFAULT_SENDMAIL);
+        let command = match sendmail_path.exists() {
+            true => sendmail_path,
+            false => match which::which("sendmail") {
+                Ok(path) => path,
+                Err(e) => panic!("sendmail not found in $PATH: {}", e),
+            },
         }
+        .into();
+
+        SendmailTransport { command }
     }
 
     /// Creates a new transport to the given sendmail command
